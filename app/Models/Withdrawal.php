@@ -21,6 +21,10 @@ class Withdrawal extends Model
         'created_by',
     ];
 
+    protected $casts = [
+        'price' => 'float',
+    ];
+
     /**
      * Get the user that owns the deposit
      */

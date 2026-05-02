@@ -22,6 +22,11 @@ class Deposit extends Model
         'created_by',
     ];
 
+    protected $casts = [
+        'weight' => 'float',
+        'price' => 'float',
+    ];
+
     /**
      * Get the user that owns the deposit.
      */

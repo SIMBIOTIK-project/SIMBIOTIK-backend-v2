@@ -18,4 +18,8 @@ class Wastetype extends Model
         'type',
         'price',
     ];
+
+    protected $casts = [
+        'price' => 'float',
+    ];
 }
