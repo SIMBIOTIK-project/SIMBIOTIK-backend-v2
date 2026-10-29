@@ -72,14 +72,21 @@ class AuthController extends Controller
         ]);
 
         if ($validator->fails()) {
-            return response()->json($validator->errors(), 422);
+            return response()->json([
+                'success' => false,
+                'message' => 'Validasi gagal',
+                'errors' => $validator->errors()
+            ], 422);
         }
 
         $credentials = $request->only('name', 'password');
 
+        auth()->factory()->setTTL(60); // 1 jam
+    
         if (!$token = auth('api')->attempt($credentials)) {
             return response()->json([
-                'error' => 'Username atau password salah'
+                'success' => false,
+                'message' => 'Username atau password salah'
             ], 401);
         }
 
@@ -90,7 +97,7 @@ class AuthController extends Controller
     {
         auth()->logout();
 
-        return response()->json(['message' => 'Berhasil logout']);
+        return response()->json(['success' => true, 'message' => 'Berhasil logout']);
     }
 
     public function me()
@@ -140,27 +147,32 @@ class AuthController extends Controller
      */
     public function index(Request $request)
     {
-        // Get filter parameters
         $status = $request->query('status');
-        $name = $request->query('name');
+        $keyword = $request->query('keyword');
 
-        // Initialize the query
         $query = User::query();
 
-        // Apply filters if provided
         if ($status) {
             $query->where('status', $status);
         }
 
-        if ($name) {
-            $query->where('name', 'like', '%' . $name . '%');
+        if ($keyword) {
+            $query->where(function ($q) use ($keyword) {
+                $q->where('name', 'like', "%{$keyword}%")
+                ->orWhere('phone_number', 'like', "%{$keyword}%")
+                ->orWhere('id_user', 'like', "%{$keyword}%");
+            });
         }
 
-        // Get all users with pagination, applying filters
-        $users = $query->latest()->paginate(10);
+        $users = $query
+            ->orderByRaw('LOWER(name) ASC')
+            ->paginate(10);
 
-        // Return collection of users as a resource
-        return new Resource(true, 'List Data Nasabah', $users);
+        return new Resource(
+            true,
+            'List Data Nasabah',
+            $users
+        );
     }
 
     /**
@@ -241,11 +253,11 @@ class AuthController extends Controller
         $validator = Validator::make($request->all(), [
             'name'        => 'required|string',
             'email'       => 'required|email|unique:users,email,' . $id,
-            'password'    => 'nullable|string|min:6',
+            // 'password'    => 'nullable|string|min:6',
             'nik'         => 'required|string',
             'phone_number' => 'required|string',
-            'address'     => 'required|string',
-            'status'      => 'required|string',
+            // 'address'     => 'required|string',
+            // 'status'      => 'required|string',
         ]);
 
         // Check if validation fails
@@ -307,13 +319,27 @@ class AuthController extends Controller
         return new Resource(true, 'Data Nasabah Berhasil Dihapus!', $user);
     }
 
+    public function refresh()
+    {
+        try {
+            return $this->responseWithToken(auth()->refresh());
+        } catch (\Throwable $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Token tidak valid atau sudah kedaluwarsa',
+             ], 401);
+        }
+    }
+
     protected function responseWithToken($token)
     {
+        $ttl = auth()->factory()->getTTL();
         return response()->json([
             'success' => true,
             'token' => $token,
             'token_type' => 'bearer',
-            'expires_in' => auth()->factory()->getTTL() * 1440,
+            'expires_in' => $ttl * 60,
+            'expires_at' => now()->addMinutes($ttl)->timestamp,
             'user' => auth()->user()
         ]);
     }

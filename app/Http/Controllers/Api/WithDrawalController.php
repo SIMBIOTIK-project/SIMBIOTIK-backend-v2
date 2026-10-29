@@ -15,13 +15,33 @@ class WithDrawalController extends Controller
         // Get the id_user from the request, if exists
         $id_user = $request->query('id_user');
 
+        $date = $request->query('date');
+
+        $start_date = $request->query('start_date');
+        $end_date = $request->query('end_date');
+
         // Query withdrawal with option
         $withdrawal = Withdrawal::with(['user'])
             ->when($id_user, function($query, $id_user) {
                 return $query->where('id_user', $id_user);
             })
+            ->when($date, function($query, $date) {
+                return $query->whereDate('created_at', $date);
+            })
+            ->when(
+                $start_date && $end_date,
+                function ($query) use ($start_date, $end_date) {
+                    $query->whereBetween(
+                        'created_at',
+                        [
+                            $start_date . ' 00:00:00',
+                            $end_date . ' 23:59:59',
+                        ]
+                    );
+                }
+            )
             ->latest()
-            ->paginate(10);
+            ->paginate($request->get('per_page', 10));
 
         // Return collection of withdrawals as a resource
         return new Resource(true, 'List Data Withdrawal', $withdrawal);

@@ -15,10 +15,17 @@ class WastetypeController extends Controller
      * 
      * @return void
      */
-    public function index()
+    public function index(Request $request)
     {
+        $keyword = request()->keyword;
+
         //get all wasteType
-        $wasteTypes = Wastetype::latest()->paginate(10);
+        $wasteTypes = Wastetype::query()
+            ->when($keyword, function ($query) use ($keyword) {
+                $query->where('type', 'like', "%{$keyword}%");
+            })
+            ->orderBy('type', 'asc')
+            ->paginate(10);
 
         //return collection of post as a resource
         return new Resource(true, 'List Data Waste Type', $wasteTypes);

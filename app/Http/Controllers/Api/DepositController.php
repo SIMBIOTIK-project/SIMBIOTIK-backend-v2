@@ -18,19 +18,49 @@ class DepositController extends Controller
      */
     public function index(Request $request)
     {
-        // Get the user_id from the request, if exists
         $user_id = $request->query('user_id');
+        $waste_type_id = $request->query('waste_type_id');
 
-        // Query deposits with optional filtering by user_id
-        $deposits = Deposit::with(['user', 'wastetype'])
-            ->when($user_id, function ($query, $user_id) {
-                return $query->where('user_id', $user_id);
+        $date = $request->query('date');
+
+        $start_date = $request->query('start_date');
+        $end_date = $request->query('end_date');
+
+        $deposits = Deposit::with([
+            'user',
+            'wastetype'
+        ])
+            ->when($user_id, function ($query) use ($user_id) {
+                $query->where('id_user', $user_id);
             })
+            ->when($waste_type_id, function ($query) use ($waste_type_id) {
+                $query->where('id_wastetype', $waste_type_id);
+            })
+            ->when($date, function ($query) use ($date) {
+                $query->whereDate('created_at', $date);
+            })
+            ->when(
+                $start_date && $end_date,
+                function ($query) use ($start_date, $end_date) {
+                    $query->whereBetween(
+                        'created_at',
+                        [
+                            $start_date . ' 00:00:00',
+                            $end_date . ' 23:59:59',
+                        ]
+                    );
+                }
+            )
             ->latest()
-            ->paginate(10);
+            ->paginate(
+                $request->get('per_page', 10)
+            );
 
-        //return collection of deposits as a resource
-        return new Resource(true, 'List Data Deposit', $deposits);
+        return new Resource(
+            true,
+            'List Data Deposit',
+            $deposits
+        );
     }
 
     /**
